@@ -1,0 +1,25 @@
+{
+    "Guid": "873d495f-940e-4b86-a1f4-4f0fc7be8b8b",
+    "Request": {
+        "Path": "/sig",
+        "Methods": [
+            "post"
+        ],
+        "Body": {
+            "Matchers": [
+                {
+                    "Name": "WildcardMatcher",
+                    "Pattern": "eyJhbGciOiJIUzI1NiIsImN0eSI6ImFwcGxpY2F0aW9uL2pzb24iLCJ0eXAiOiJKV1QifQ.eyJmb28iOiJiYXIifQ.fxXViK_vZ9CP4bGlO309bifjCewRB7qa67WsXxjcn_4"
+                }
+            ]
+        }
+    },
+    "Response": {
+        "BodyAsJson": {
+            "valid": true
+        },
+        "Headers": {
+            "Content-Type": "application/json"
+        }
+    }
+}
