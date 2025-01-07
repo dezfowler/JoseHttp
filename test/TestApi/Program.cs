@@ -11,10 +11,10 @@ using Microsoft.IdentityModel.Tokens;
 
 IDictionary<string, JsonWebKey> TestingKeys = new Dictionary<string, JsonWebKey>{
     ["A"] = JsonWebKey.Create(/* language=JSON */"""
-{ 
+{
   "kty": "oct",
   "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
-}   
+}
 """),
     ["B"] = JsonWebKey.Create(/* language=JSON */"""
 {
@@ -27,7 +27,7 @@ IDictionary<string, JsonWebKey> TestingKeys = new Dictionary<string, JsonWebKey>
   "dp":"BwKfV3Akq5_MFZDFZCnW-wzl-CCo83WoZvnLQwCTeDv8uzluRSnm71I3QCLdhrqE2e9YkxvuxdBfpT_PI7Yz-FOKnu1R6HsJeDCjn12Sk3vmAktV2zb34MCdy7cpdTh_YVr7tss2u6vneTwrA86rZtu5Mbr1C1XsmvkxHQAdYo0",
   "dq":"h_96-mK1R_7glhsum81dZxjTnYynPbZpHziZjeeHcXYsXaaMwkOlODsWa7I9xXDoRwbKgB719rrmI2oKr6N3Do9U0ajaHF-NKJnwgjMd2w9cjz3_-kyNlxAr2v4IKhGNpmM5iIgOS1VZnOZ68m6_pbLBSp3nssTdlqvd0tIiTHU",
   "qi":"IYd7DHOhrWvxkwPQsRM2tOgrjbcrfvtQJipd-DlcxyVuuM9sQLdgjVk2oy26F0EmpScGLq2MowX7fhd_QJQ3ydy5cY7YIBi87w93IKLEdfnbJtoOPLUW0ITrJReOgo1cq9SbsxYawBgfp_gh6A5603k2-ZQwVK0JKSHuLFkuQ3U"
-}   
+}
 """),
     ["C"] = JsonWebKey.Create(/* language=JSON */"""
 {
@@ -56,7 +56,7 @@ if (app.Environment.IsDevelopment())
     IdentityModelEventSource.ShowPII = true;
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 var summaries = new[]
 {
@@ -87,13 +87,6 @@ app.Map("/auto", HandleAuto);
 
 app.Map("/client/sig", HandleClientSigned);
 
-
-// app.Run(async context =>
-// {
-//     context.Response.StatusCode = 404;
-//     await context.Response.WriteAsync("Hello from non-Map delegate.");
-// });
-
 app.Run();
 
 
@@ -103,7 +96,12 @@ void HandleSigned(IApplicationBuilder app)
     app.UseMiddleware<JoseMiddleware>(new JoseOptions
     {
         RequestTransform = new JwsTransform(),
-        ResponseTransform = JoseTransform.None,
+        ResponseTransform = new JwsTransform(),
+        SignatureFormat = SignatureFormat.Detached,
+        Signer = new Signer
+        {
+            SignCreds = new SigningCredentials(TestingKeys["B"], "RS256")
+        },
         Validator = new Validator
         {
             KeyResolver = KeyResolver
@@ -112,9 +110,9 @@ void HandleSigned(IApplicationBuilder app)
 
     app.Run(async context =>
     {
-        //echo the request back out
         logger.LogInformation("In the request handler: {length}", context.Request.ContentLength);
 
+        // Check we have a JWS context
         if (context.Items["JoseRequestContext"] is JoseTransformContext joseContext)
         {
             var jwsParams = joseContext.Steps.Select(t => t.TransformParams).OfType<JwsTransform.JwsDecodeParams>().FirstOrDefault();
@@ -127,6 +125,8 @@ void HandleSigned(IApplicationBuilder app)
                 logger.LogInformation("No JWS step in context");
             }
         }
+        
+        // Echo the decoded request back out again
         context.Response.ContentLength = context.Request.ContentLength;
         context.Request.Body.Position = 0;
         await context.Request.Body.CopyToAsync(context.Response.Body);
@@ -212,10 +212,14 @@ void HandleClientSigned(IApplicationBuilder app)
                 new JoseOptions
                 {
                     RequestTransform = new JwsTransform(),
-                    ResponseTransform = JoseTransform.None,
+                    ResponseTransform = new JwsTransform(),
                     Signer = new Signer
                     {
                         SignCreds = new SigningCredentials(JsonWebKey.Create(req.signingKey), req.algo)
+                    },
+                    Validator = new Validator
+                    {
+                        KeyResolver = KeyResolver
                     },
                     SignatureFormat = SignatureFormat.Compact
                 },
@@ -228,16 +232,29 @@ void HandleClientSigned(IApplicationBuilder app)
 
         var response = await client.PostAsync(req.url, new StringContent(req.payload, new MediaTypeHeaderValue(MediaTypeNames.Application.Json)));
 
-        if (response.RequestMessage.Options.GetValueOrDefault("JoseRequestContext") is JoseTransformContext joseContext)
+        if (response.RequestMessage.Options.GetValueOrDefault("JoseRequestContext") is JoseTransformContext joseRequestContext)
         {
-            var jwsParams = joseContext.Steps.Select(t => t.TransformParams).OfType<JwsTransform.JwsEncodeParams>().FirstOrDefault();
-            if (jwsParams is {})
+            var jwsReqParams = joseRequestContext.Steps.Select(t => t.TransformParams).OfType<JwsTransform.JwsEncodeParams>().FirstOrDefault();
+            if (jwsReqParams is {})
             {
-                logger.LogInformation("JWS step found: {SigType}", jwsParams.JwsContent.GetType().Name);                
+                logger.LogInformation("JWS client request step found: {SigType}", jwsReqParams.JwsContent.GetType().Name);                
             }
             else
             {
-                logger.LogInformation("No JWS step in context");
+                logger.LogInformation("No JWS client request step found");
+            }
+        }
+
+        if (response.RequestMessage.Options.GetValueOrDefault("JoseResponseContext") is JoseTransformContext joseResponseContext)
+        {
+            var jwsResponseParams = joseResponseContext.Steps.Select(t => t.TransformParams).OfType<JwsTransform.JwsDecodeParams>().FirstOrDefault();
+            if (jwsResponseParams is {})
+            {
+                logger.LogInformation("JWS client response step found: {IsSigned} {IsValidated} {SigType}", jwsResponseParams.IsSigned, jwsResponseParams.IsValidated, jwsResponseParams.JwsContent.GetType().Name);                
+            }
+            else
+            {
+                logger.LogInformation("No JWS client response step found");
             }
         }
         
@@ -245,11 +262,12 @@ void HandleClientSigned(IApplicationBuilder app)
     });
 }
 
-
 IEnumerable<SecurityKey> KeyResolver(string token, SecurityToken securityToken, string kid, TokenValidationParameters validationParameters)
 {
-
-    if (securityToken.SigningKey != null) yield return securityToken.SigningKey;
+    if (securityToken.SigningKey != null)
+    { 
+        yield return securityToken.SigningKey;
+    }
 
     // Embedded key
     if (securityToken is JsonWebToken jsonToken && jsonToken.TryGetHeaderValue<string>("jwk", out var signingKeyJson))
@@ -275,6 +293,5 @@ record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
-
 
 record ClientRequest(string url, string payload, string signingKey, string algo);

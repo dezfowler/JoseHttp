@@ -14,6 +14,9 @@ const config = {
 
 console.log(`config: ${JSON.stringify(config)}`);
 
+const keySetJson = await fetch('http://localhost:9091/jwks', { method: 'GET' });
+const keySet = await jose.JWK.asKeyStore(await keySetJson.asJson());
+
 // Setup express app
 const app = express();
 
@@ -32,9 +35,18 @@ app.post('/client/sig', async (req, res) => {
         const clientResponse = await fetch(clientReq.url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/jose' },
-            body: jws });
-                 
-        res.send(await clientResponse.arrayBuffer()); 
+            body: jws });     
+        
+        if (!clientResponse.ok) {
+            return res.status(clientResponse.status).send(`Error: ${clientResponse.statusText}`);
+        }
+
+        const verifyResult = jose.JWS.createVerify(keySet)
+                .verify(await clientResponse.body.asArrayBuffer());
+            
+        clientResponse.headers.forEach((value, key) => { res.setHeader(key, value); });
+
+        clientResponse.body.pipe(res);
     }
     catch (error) { 
         res.status(500).send(`Error signing the content: ${error.message}`);

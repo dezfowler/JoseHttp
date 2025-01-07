@@ -102,7 +102,7 @@ Accept: *
 Content-Type: application/json
 
 {
-  "url":"http://wiremock:80/sig",
+  "url":"{{WireMock_HostAddress}}/sig",
   "payload":"{\"foo\":\"bar\"}",
   "signingKey":"{\"kty\": \"oct\",\"k\": \"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\"}",
   "algo":"HS256"
@@ -114,8 +114,20 @@ Accept: *
 Content-Type: application/json
 
 {
-  "url":"http://host.containers.internal:5236/sig",
-  "payload":"{\"foo\":\"bar\"}",
+  "url":"{{WireMock_HostAddress}}/sig",
+  "payload":"{\"foo\":\"bar2\"}",
+  "signingKey":"{\"kty\": \"oct\",\"k\": \"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\"}",
+  "algo":"HS256"
+}
+
+### 
+POST {{NodeApi_HostAddress}}/client/sig
+Accept: *
+Content-Type: application/json
+
+{
+  "url":"{{TestApi_HostAddress}}/sig",
+  "payload":"{\"foo\":\"bar2\"}",
   "signingKey":"{\"kty\": \"oct\",\"k\": \"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\"}",
   "algo":"HS256"
 }

@@ -1,3 +1,4 @@
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var mappingsPath = Path.Combine(Directory.GetCurrentDirectory(), "WireMockMappings");
@@ -8,6 +9,7 @@ var wiremock = builder
     .WithReadStaticMappings();
 
 var nodeapi = builder.AddDockerfile("nodeapi", "../TestApiNode")
+    .WaitFor(wiremock)
     .WithHttpEndpoint(port: 16363, targetPort: 80, env: "PORT", name: "nodeapi")
     .WithExternalHttpEndpoints();
 
