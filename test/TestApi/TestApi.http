@@ -1,4 +1,4 @@
-@TestApi_HostAddress = http://localhost:5236
+@TestApi_HostAddress = http://192.168.68.67:5236
 @NodeApi_HostAddress = http://localhost:16363
 @WireMock_HostAddress = http://localhost:9091
 

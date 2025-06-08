@@ -1,4 +1,5 @@
 
+using JoseCore;
 using System.Net.Http.Headers;
 
 namespace JoseHttp.Client;
@@ -6,9 +7,9 @@ namespace JoseHttp.Client;
 public class JoseHandler : DelegatingHandler
 {
     private readonly JoseServices joseServices;
-    private readonly JoseOptions joseOptions;
+    private readonly JoseHttpOptions joseOptions;
 
-    public JoseHandler(JoseOptions joseOptions, JoseServices joseServices)
+    public JoseHandler(JoseHttpOptions joseOptions, JoseServices joseServices)
         // TODO this isn't right... need to do handler proper
         : base(new HttpClientHandler())
     {
@@ -20,7 +21,7 @@ public class JoseHandler : DelegatingHandler
     {
         var joseRequestContext = new JoseTransformContext
         {
-            Options = joseOptions,
+            //Options = joseOptions,
             Services = joseServices,
             Mode = TransformMode.Encode,
         };
@@ -28,7 +29,7 @@ public class JoseHandler : DelegatingHandler
 
         var joseResponseContext = new JoseTransformContext
         {
-            Options = joseOptions,
+            //Options = joseOptions,
             Services = joseServices,
             Mode = TransformMode.Decode,
         };

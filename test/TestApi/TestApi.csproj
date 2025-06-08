@@ -13,7 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\JoseHttp\JoseHttp.csproj" />
-    <ProjectReference Include="..\..\src\JoseHttp.MicrosoftJwt\JoseHttp.MicrosoftJwt.csproj" />
+    <ProjectReference Include="..\..\src\JoseCore.MicrosoftJwt\JoseCore.MicrosoftJwt.csproj" />
   </ItemGroup>
 
 </Project>

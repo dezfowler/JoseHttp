@@ -14,8 +14,8 @@ const config = {
 
 console.log(`config: ${JSON.stringify(config)}`);
 
-const keySetJson = await fetch('http://localhost:9091/jwks', { method: 'GET' });
-const keySet = await jose.JWK.asKeyStore(await keySetJson.asJson());
+//const keySetJson = await fetch('http://localhost:9091/jwks', { method: 'GET' });
+//const keySet = await jose.JWK.asKeyStore(await keySetJson.asJson());
 
 // Setup express app
 const app = express();
@@ -41,8 +41,8 @@ app.post('/client/sig', async (req, res) => {
             return res.status(clientResponse.status).send(`Error: ${clientResponse.statusText}`);
         }
 
-        const verifyResult = jose.JWS.createVerify(keySet)
-                .verify(await clientResponse.body.asArrayBuffer());
+        //const verifyResult = jose.JWS.createVerify(keySet)
+        //        .verify(await clientResponse.body.asArrayBuffer());
             
         clientResponse.headers.forEach((value, key) => { res.setHeader(key, value); });
 

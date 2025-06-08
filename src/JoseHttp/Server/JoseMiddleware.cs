@@ -1,5 +1,5 @@
-using System.Buffers.Text;
 using System.Text;
+using JoseCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
@@ -8,9 +8,9 @@ namespace JoseHttp.Server;
 public class JoseMiddleware
 {
     private readonly RequestDelegate next;
-    private readonly JoseOptions joseOptions;
+    private readonly JoseHttpOptions joseOptions;
 
-    public JoseMiddleware(RequestDelegate next, JoseOptions joseOptions)
+    public JoseMiddleware(RequestDelegate next, JoseHttpOptions joseOptions)
     {
         this.next = next;
         this.joseOptions = joseOptions;
@@ -24,10 +24,11 @@ public class JoseMiddleware
         
         string requestContent = await ReadAllAsStringAsync(context.Request.Body);
 
+        // Create a context for decoding the request
         var joseRequestContext = new JoseTransformContext 
         {
             Mode = TransformMode.Decode,
-            Options = joseOptions,
+            //Options = joseOptions,
             Services = new JoseServices 
             {
                 Base64Url = base64Url
@@ -51,7 +52,7 @@ public class JoseMiddleware
         context.Request.ContentLength = context.Request.Body.Length;
         
         using var responseBuffer = new MemoryStream();
-        var originalBodyStream = context.Response.Body;
+        var originalResponseBodyStream = context.Response.Body;
         context.Response.Body = responseBuffer;
 
         await next(context);
@@ -60,15 +61,17 @@ public class JoseMiddleware
 
         logger.LogInformation("Decoded response content: {responseContent}", responseContent);
 
+        // Create a context for encoding the response
         var joseResponseContext = new JoseTransformContext 
         {
             Mode = TransformMode.Encode,
-            Options = joseOptions,
+            //Options = joseOptions,
             Services = new JoseServices 
             {
                 Base64Url = base64Url
             } 
         };
+
         joseResponseContext.Steps.Push(new JoseTransformStep
         {
             ContentType = context.Response.ContentType,
@@ -89,7 +92,7 @@ public class JoseMiddleware
             context.Response.Headers.TryAdd(joseOptions.DetachedSignatureHeaderName ?? "x-jws-signature", final.DetachedSignatures);
         }
 
-        context.Response.Body = originalBodyStream;
+        context.Response.Body = originalResponseBodyStream;
         await finalResponseStream.CopyToAsync(context.Response.Body);
 
         static Task<string> ReadAllAsStringAsync(Stream stream)

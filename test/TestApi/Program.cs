@@ -1,6 +1,7 @@
-using System.Buffers;
 using System.Net.Http.Headers;
 using System.Net.Mime;
+using JoseCore;
+using JoseCore.Jws;
 using JoseHttp;
 using JoseHttp.Client;
 using JoseHttp.MicrosoftJwt;
@@ -58,25 +59,6 @@ if (app.Environment.IsDevelopment())
 
 //app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
 app.Map("/sig", HandleSigned);
 
 app.Map("/enc", HandleEncrypted);
@@ -93,10 +75,9 @@ app.Run();
 void HandleSigned(IApplicationBuilder app)
 {
     var logger = app.ApplicationServices.GetRequiredService<ILogger<String>>();
-    app.UseMiddleware<JoseMiddleware>(new JoseOptions
+
+    var jwsOptions = new JwsOptions
     {
-        RequestTransform = new JwsTransform(),
-        ResponseTransform = new JwsTransform(),
         SignatureFormat = SignatureFormat.Detached,
         Signer = new Signer
         {
@@ -106,6 +87,12 @@ void HandleSigned(IApplicationBuilder app)
         {
             KeyResolver = KeyResolver
         }
+    };
+
+    app.UseMiddleware<JoseMiddleware>(new JoseHttpOptions
+    {
+        RequestTransform = new JwsTransform(jwsOptions),
+        ResponseTransform = new JwsTransform(jwsOptions),
     });
 
     app.Run(async context =>
@@ -136,7 +123,7 @@ void HandleSigned(IApplicationBuilder app)
 
 void HandleEncrypted(IApplicationBuilder app)
 {
-    app.UseMiddleware<JoseMiddleware>(new JoseOptions
+    app.UseMiddleware<JoseMiddleware>(new JoseHttpOptions
     {
         RequestTransform = new JweTransform
         {
@@ -157,19 +144,27 @@ void HandleEncrypted(IApplicationBuilder app)
 
 void HandleSignedAndEncrypted(IApplicationBuilder app)
 {
-    app.UseMiddleware<JoseMiddleware>(new JoseOptions
+    var jwsOptions = new JwsOptions
+    {
+        SignatureFormat = SignatureFormat.Detached,
+        Signer = new Signer
+        {
+            SignCreds = new SigningCredentials(TestingKeys["B"], "RS256")
+        },
+        Validator = new Validator
+        {
+            KeyResolver = KeyResolver
+        }
+    };
+
+    app.UseMiddleware<JoseMiddleware>(new JoseHttpOptions
     {
         RequestTransform = JoseTransform.CreateChain(
             new JweTransform{}, 
-            new JwsTransform
-            {
-            
-            }),
+            new JwsTransform(jwsOptions)
+            ),
         ResponseTransform = JoseTransform.CreateChain(
-            new JwsTransform
-            {
-                
-            },
+            new JwsTransform(jwsOptions),
             new JweTransform{})
     });
 
@@ -182,7 +177,7 @@ void HandleSignedAndEncrypted(IApplicationBuilder app)
 
 void HandleAuto(IApplicationBuilder app)
 {
-    app.UseMiddleware<JoseMiddleware>(new JoseOptions
+    app.UseMiddleware<JoseMiddleware>(new JoseHttpOptions
     {
         RequestTransform = JoseTransform.Detect,
         ResponseTransform = JoseTransform.None,
@@ -207,21 +202,25 @@ void HandleClientSigned(IApplicationBuilder app)
 
         var req = await context.Request.ReadFromJsonAsync<ClientRequest>();
 
+        var jwsOptions = new JwsOptions
+        {
+            SignatureFormat = SignatureFormat.Compact,
+            Signer = new Signer
+            {
+                SignCreds = new SigningCredentials(JsonWebKey.Create(req.signingKey), req.algo)
+            },
+            Validator = new Validator
+            {
+                KeyResolver = KeyResolver
+            }
+        };
+
         var client = new HttpClient(
             new JoseHandler(
-                new JoseOptions
+                new JoseHttpOptions
                 {
-                    RequestTransform = new JwsTransform(),
-                    ResponseTransform = new JwsTransform(),
-                    Signer = new Signer
-                    {
-                        SignCreds = new SigningCredentials(JsonWebKey.Create(req.signingKey), req.algo)
-                    },
-                    Validator = new Validator
-                    {
-                        KeyResolver = KeyResolver
-                    },
-                    SignatureFormat = SignatureFormat.Compact
+                    RequestTransform = new JwsTransform(jwsOptions),
+                    ResponseTransform = new JwsTransform(jwsOptions),
                 },
                 new JoseServices 
                 {
